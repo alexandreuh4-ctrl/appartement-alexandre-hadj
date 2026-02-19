@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Appartement de Alexandre HADJ</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg,#667eea,#764ba2);
+    margin:0;
+    padding:20px;
+}
+h1 {
+    text-align:center;
+    color:white;
+}
+.container {
+    max-width:600px;
+    margin:auto;
+    background:white;
+    padding:20px;
+    border-radius:15px;
+    box-shadow:0 5px 20px rgba(0,0,0,0.3);
+}
+.stars span {
+    font-size:32px;
+    cursor:pointer;
+    color:#ccc;
+    transition:0.2s;
+}
+.stars span:hover,
+.stars span.active {
+    color:gold;
+    transform:scale(1.2);
+}
+textarea,input {
+    width:100%;
+    padding:10px;
+    margin-top:10px;
+    border-radius:8px;
+}
+button {
+    width:100%;
+    padding:10px;
+    margin-top:10px;
+    border:none;
+    background:#667eea;
+    color:white;
+    font-size:16px;
+    border-radius:8px;
+}
+.review {
+    border-bottom:1px solid #ddd;
+    padding:10px 0;
+}
+.deleteBtn {
+    background:red;
+}
+.admin {
+    margin-top:15px;
+    background:#eee;
+    padding:10px;
+    border-radius:8px;
+}
+.average {
+    text-align:center;
+    font-size:20px;
+    margin-bottom:10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Appartement de Alexandre HADJ</h1>
+
+<div class="container">
+
+<div class="average" id="moyenne">Moyenne : 0 ⭐</div>
+
+<input id="nom" placeholder="Ton nom">
+
+<div class="stars" id="stars">
+<span onclick="setNote(1)">⭐</span>
+<span onclick="setNote(2)">⭐</span>
+<span onclick="setNote(3)">⭐</span>
+<span onclick="setNote(4)">⭐</span>
+<span onclick="setNote(5)">⭐</span>
+</div>
+
+<textarea id="commentaire" placeholder="Écris ton avis (min 10 caractères)"></textarea>
+<button onclick="ajouterAvis()">Envoyer l'avis</button>
+
+<h2>Avis</h2>
+<div id="listeAvis"></div>
+
+<button onclick="exportAvis()">Exporter les avis</button>
+
+<div class="admin">
+<h3>Mode admin</h3>
+<input type="password" id="password" placeholder="Mot de passe admin">
+<button onclick="activerAdmin()">Activer</button>
+<button onclick="resetAvis()">Tout supprimer</button>
+</div>
+
+</div>
+
+<script>
+let avis = JSON.parse(localStorage.getItem("avisAppartement")) || [];
+let noteSelectionnee = 0;
+let admin = false;
+const motDePasse = "alexandre123";
+
+function setNote(note) {
+    noteSelectionnee = note;
+    const stars = document.querySelectorAll(".stars span");
+    stars.forEach((s,i)=>{
+        s.classList.toggle("active", i < note);
+    });
+}
+
+function ajouterAvis() {
+    const nom = document.getElementById("nom").value;
+    const commentaire = document.getElementById("commentaire").value;
+
+    if(nom.trim()=="" || commentaire.length < 10 || noteSelectionnee==0){
+        alert("Remplis tout correctement (10 caractères minimum).");
+        return;
+    }
+
+    const date = new Date().toLocaleDateString();
+
+    avis.push({nom, note:noteSelectionnee, commentaire, date});
+    localStorage.setItem("avisAppartement", JSON.stringify(avis));
+
+    document.getElementById("nom").value="";
+    document.getElementById("commentaire").value="";
+    setNote(0);
+    afficherAvis();
+}
+
+function afficherAvis(){
+    const liste=document.getElementById("listeAvis");
+    liste.innerHTML="";
+    let total=0;
+
+    avis.forEach((a,index)=>{
+        total+=a.note;
+        let div=document.createElement("div");
+        div.className="review";
+        div.innerHTML=`
+        <strong>${a.nom}</strong> - ${a.date}<br>
+        ${"⭐".repeat(a.note)}
+        <p>${a.commentaire}</p>
+        ${admin ? `<button class="deleteBtn" onclick="supprimerAvis(${index})">Supprimer</button>`:""}
+        `;
+        liste.appendChild(div);
+    });
+
+    let moyenne=avis.length?(total/avis.length).toFixed(1):0;
+    document.getElementById("moyenne").innerText="Moyenne : "+moyenne+" ⭐";
+}
+
+function supprimerAvis(index){
+    avis.splice(index,1);
+    localStorage.setItem("avisAppartement", JSON.stringify(avis));
+    afficherAvis();
+}
+
+function activerAdmin(){
+    const pass=document.getElementById("password").value;
+    if(pass===motDePasse){
+        admin=true;
+        alert("Mode admin activé");
+        afficherAvis();
+    } else alert("Mot de passe incorrect");
+}
+
+function resetAvis(){
+    if(admin && confirm("Tout supprimer ?")){
+        avis=[];
+        localStorage.removeItem("avisAppartement");
+        afficherAvis();
+    }
+}
+
+function exportAvis(){
+    const data=JSON.stringify(avis,null,2);
+    const blob=new Blob([data],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download="avis.json";
+    a.click();
+}
+
+afficherAvis();
+</script>
+
+</body>
+</html>
