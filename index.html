@@ -129,7 +129,6 @@ button {
 
 </div>
 
-<!-- Firebase v9 modulaire -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
@@ -202,14 +201,7 @@ photoInput.addEventListener("change", () => {
     }
 });
 
-// 🔹 Upload photo dans Firebase Storage
-async function uploadPhoto(file) {
-    const photoRef = storageRef(storage, 'photos/' + Date.now() + '_' + file.name);
-    await uploadBytes(photoRef, file);
-    return getDownloadURL(photoRef);
-}
-
-// 🔹 Ajouter un avis
+// 🔹 Ajouter un avis avec photo
 window.ajouterAvis = async function() {
     const nom = document.getElementById("nom").value.trim();
     const commentaire = document.getElementById("commentaire").value.trim();
@@ -223,8 +215,11 @@ window.ajouterAvis = async function() {
     let photoURL = "";
     if(file){
         try {
-            photoURL = await uploadPhoto(file);
+            const photoRef = storageRef(storage, 'photos/' + Date.now() + '_' + file.name);
+            await uploadBytes(photoRef, file);
+            photoURL = await getDownloadURL(photoRef);
         } catch(e){
+            console.error(e);
             alert("Erreur lors de l'upload de l'image.");
             return;
         }
@@ -243,7 +238,7 @@ window.ajouterAvis = async function() {
     noteSelectionnee = 0;
     updateStars();
     document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : 0";
-}
+};
 
 // 🔹 Afficher les avis
 function afficherAvis(snapshot) {
