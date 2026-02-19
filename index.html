@@ -22,16 +22,26 @@ h1 {
     border-radius:15px;
     box-shadow:0 5px 20px rgba(0,0,0,0.3);
 }
+.stars {
+    display:flex;
+    justify-content:center;
+    margin-top:10px;
+}
 .stars span {
     font-size:32px;
     cursor:pointer;
     color:#ccc;
-    transition:0.2s;
+    transition: transform 0.2s, color 0.2s;
+    margin:0 5px;
 }
 .stars span:hover,
+.stars span.hovered {
+    color:gold;
+    transform: scale(1.4);
+}
 .stars span.active {
     color:gold;
-    transform:scale(1.2);
+    transform: scale(1.2);
 }
 textarea,input {
     width:100%;
@@ -48,6 +58,7 @@ button {
     color:white;
     font-size:16px;
     border-radius:8px;
+    cursor:pointer;
 }
 .review {
     border-bottom:1px solid #ddd;
@@ -55,6 +66,8 @@ button {
 }
 .deleteBtn {
     background:red;
+    color:white;
+    margin-top:5px;
 }
 .admin {
     margin-top:15px;
@@ -66,6 +79,11 @@ button {
     text-align:center;
     font-size:20px;
     margin-bottom:10px;
+}
+#noteSelectionneeDisplay {
+    text-align:center; 
+    margin-top:5px; 
+    font-weight:bold;
 }
 </style>
 </head>
@@ -81,12 +99,13 @@ button {
 <input id="nom" placeholder="Ton nom">
 
 <div class="stars" id="stars">
-<span onclick="setNote(1)">⭐</span>
-<span onclick="setNote(2)">⭐</span>
-<span onclick="setNote(3)">⭐</span>
-<span onclick="setNote(4)">⭐</span>
-<span onclick="setNote(5)">⭐</span>
+    <span data-note="1">⭐</span>
+    <span data-note="2">⭐</span>
+    <span data-note="3">⭐</span>
+    <span data-note="4">⭐</span>
+    <span data-note="5">⭐</span>
 </div>
+<div id="noteSelectionneeDisplay">Note choisie : 0</div>
 
 <textarea id="commentaire" placeholder="Écris ton avis (min 10 caractères)"></textarea>
 <button onclick="ajouterAvis()">Envoyer l'avis</button>
@@ -111,31 +130,54 @@ let noteSelectionnee = 0;
 let admin = false;
 const motDePasse = "alexandre123";
 
-function setNote(note) {
-    noteSelectionnee = note;
-    const stars = document.querySelectorAll(".stars span");
-    stars.forEach((s,i)=>{
-        s.classList.toggle("active", i < note);
+// Sélection des étoiles avec survol et clic
+const stars = document.querySelectorAll(".stars span");
+
+stars.forEach(star => {
+    star.addEventListener("mouseover", () => {
+        const note = parseInt(star.dataset.note);
+        stars.forEach(s => {
+            s.classList.toggle("hovered", parseInt(s.dataset.note) <= note);
+        });
+    });
+
+    star.addEventListener("mouseout", () => {
+        stars.forEach(s => s.classList.remove("hovered"));
+    });
+
+    star.addEventListener("click", () => {
+        noteSelectionnee = parseInt(star.dataset.note);
+        updateStars();
+        document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : " + noteSelectionnee;
+    });
+});
+
+function updateStars() {
+    stars.forEach(s => {
+        s.classList.toggle("active", parseInt(s.dataset.note) <= noteSelectionnee);
     });
 }
 
 function ajouterAvis() {
-    const nom = document.getElementById("nom").value;
-    const commentaire = document.getElementById("commentaire").value;
+    const nom = document.getElementById("nom").value.trim();
+    const commentaire = document.getElementById("commentaire").value.trim();
 
-    if(nom.trim()=="" || commentaire.length < 10 || noteSelectionnee==0){
-        alert("Remplis tout correctement (10 caractères minimum).");
+    if(nom === "" || commentaire.length < 10 || noteSelectionnee === 0){
+        alert("Remplis tout correctement (10 caractères minimum et note).");
         return;
     }
 
     const date = new Date().toLocaleDateString();
-
-    avis.push({nom, note:noteSelectionnee, commentaire, date});
+    avis.push({nom, note: noteSelectionnee, commentaire, date});
     localStorage.setItem("avisAppartement", JSON.stringify(avis));
 
+    // Reset
     document.getElementById("nom").value="";
     document.getElementById("commentaire").value="";
-    setNote(0);
+    noteSelectionnee = 0;
+    updateStars();
+    document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : 0";
+
     afficherAvis();
 }
 
@@ -157,7 +199,7 @@ function afficherAvis(){
         liste.appendChild(div);
     });
 
-    let moyenne=avis.length?(total/avis.length).toFixed(1):0;
+    let moyenne=avis.length ? (total/avis.length).toFixed(1) : 0;
     document.getElementById("moyenne").innerText="Moyenne : "+moyenne+" ⭐";
 }
 
@@ -194,7 +236,9 @@ function exportAvis(){
     a.click();
 }
 
+// Affichage initial
 afficherAvis();
+updateStars();
 </script>
 
 </body>
