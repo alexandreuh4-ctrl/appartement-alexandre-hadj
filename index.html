@@ -85,6 +85,11 @@ button {
     margin-top:5px; 
     font-weight:bold;
 }
+.review img {
+    max-width:100%;
+    margin-top:5px;
+    border-radius:8px;
+}
 </style>
 </head>
 
@@ -108,6 +113,8 @@ button {
 <div id="noteSelectionneeDisplay">Note choisie : 0</div>
 
 <textarea id="commentaire" placeholder="Écris ton avis (min 10 caractères)"></textarea>
+<input type="file" id="photo" accept="image/*">
+<img id="preview" style="max-width:100%; margin-top:5px; border-radius:8px; display:none;">
 <button onclick="ajouterAvis()">Envoyer l'avis</button>
 
 <h2>Avis</h2>
@@ -124,138 +131,177 @@ button {
 
 <!-- Firebase v9 modulaire -->
 <script type="module">
-  // 🔹 Import des fonctions Firebase
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-  import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-storage.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics.js";
 
-  // 🔹 Configuration Firebase
-  const firebaseConfig = {
-    apiKey: "AIzaSyA-iFaigj6_aHyyvc8wWHDVFpaiX1j-qOU",
-    authDomain: "appartement-hadj-alexandre.firebaseapp.com",
-    databaseURL: "https://appartement-hadj-alexandre-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "appartement-hadj-alexandre",
-    storageBucket: "appartement-hadj-alexandre.firebasestorage.app",
-    messagingSenderId: "446838776607",
-    appId: "1:446838776607:web:e11dd12a27c52952afc62a",
-    measurementId: "G-HFL77GDB15"
-  };
+// 🔹 Configuration Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyA-iFaigj6_aHyyvc8wWHDVFpaiX1j-qOU",
+  authDomain: "appartement-hadj-alexandre.firebaseapp.com",
+  databaseURL: "https://appartement-hadj-alexandre-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "appartement-hadj-alexandre",
+  storageBucket: "appartement-hadj-alexandre.firebasestorage.app",
+  messagingSenderId: "446838776607",
+  appId: "1:446838776607:web:e11dd12a27c52952afc62a",
+  measurementId: "G-HFL77GDB15"
+};
 
-  // 🔹 Initialisation
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-  const db = getDatabase(app);
+// 🔹 Initialisation
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const db = getDatabase(app);
+const storage = getStorage(app);
 
-  // Variables
-  let noteSelectionnee = 0;
-  let admin = false;
-  const motDePasse = "alexandre123";
+// Variables
+let noteSelectionnee = 0;
+let admin = false;
+const motDePasse = "alexandre123";
 
-  // ⭐ Étoiles interactives
-  const stars = document.querySelectorAll(".stars span");
-  stars.forEach(star => {
-      star.addEventListener("mouseover", () => {
-          const note = parseInt(star.dataset.note);
-          stars.forEach(s => {
-              s.classList.toggle("hovered", parseInt(s.dataset.note) <= note);
-          });
-      });
-      star.addEventListener("mouseout", () => {
-          stars.forEach(s => s.classList.remove("hovered"));
-      });
-      star.addEventListener("click", () => {
-          noteSelectionnee = parseInt(star.dataset.note);
-          updateStars();
-          document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : " + noteSelectionnee;
-      });
-  });
-  function updateStars() {
-      stars.forEach(s => {
-          s.classList.toggle("active", parseInt(s.dataset.note) <= noteSelectionnee);
-      });
-  }
+// ⭐ Étoiles interactives
+const stars = document.querySelectorAll(".stars span");
+stars.forEach(star => {
+    star.addEventListener("mouseover", () => {
+        const note = parseInt(star.dataset.note);
+        stars.forEach(s => {
+            s.classList.toggle("hovered", parseInt(s.dataset.note) <= note);
+        });
+    });
+    star.addEventListener("mouseout", () => {
+        stars.forEach(s => s.classList.remove("hovered"));
+    });
+    star.addEventListener("click", () => {
+        noteSelectionnee = parseInt(star.dataset.note);
+        updateStars();
+        document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : " + noteSelectionnee;
+    });
+});
+function updateStars() {
+    stars.forEach(s => {
+        s.classList.toggle("active", parseInt(s.dataset.note) <= noteSelectionnee);
+    });
+}
 
-  // 🔹 Ajouter un avis
-  window.ajouterAvis = function() {
-      const nom = document.getElementById("nom").value.trim();
-      const commentaire = document.getElementById("commentaire").value.trim();
-      if(nom === "" || commentaire.length < 10 || noteSelectionnee === 0){
-          alert("Remplis tout correctement (10 caractères minimum et note).");
-          return;
-      }
+// 🔹 Aperçu de l'image
+const photoInput = document.getElementById("photo");
+const previewImg = document.getElementById("preview");
 
-      const date = new Date().toLocaleDateString();
-      const newAvisRef = push(ref(db, 'avis'));
-      set(newAvisRef, {nom, note: noteSelectionnee, commentaire, date});
+photoInput.addEventListener("change", () => {
+    const file = photoInput.files[0];
+    if(file){
+        const reader = new FileReader();
+        reader.onload = e => {
+            previewImg.src = e.target.result;
+            previewImg.style.display = "block";
+        };
+        reader.readAsDataURL(file);
+    } else {
+        previewImg.src = "";
+        previewImg.style.display = "none";
+    }
+});
 
-      document.getElementById("nom").value = "";
-      document.getElementById("commentaire").value = "";
-      noteSelectionnee = 0;
-      updateStars();
-      document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : 0";
-  }
+// 🔹 Upload photo dans Firebase Storage
+async function uploadPhoto(file) {
+    const photoRef = storageRef(storage, 'photos/' + Date.now() + '_' + file.name);
+    await uploadBytes(photoRef, file);
+    return getDownloadURL(photoRef);
+}
 
-  // 🔹 Afficher les avis
-  function afficherAvis(snapshot) {
-      const liste = document.getElementById("listeAvis");
-      liste.innerHTML = "";
-      const data = snapshot.val();
-      let total = 0;
-      let count = 0;
+// 🔹 Ajouter un avis
+window.ajouterAvis = async function() {
+    const nom = document.getElementById("nom").value.trim();
+    const commentaire = document.getElementById("commentaire").value.trim();
+    const file = document.getElementById("photo").files[0];
 
-      if(data){
-          Object.keys(data).forEach(key => {
-              const a = data[key];
-              total += a.note;
-              count++;
-              const div = document.createElement("div");
-              div.className = "review";
-              div.innerHTML = `
-                  <strong>${a.nom}</strong> - ${a.date}<br>
-                  ${"⭐".repeat(a.note)}
-                  <p>${a.commentaire}</p>
-                  ${admin ? `<button class="deleteBtn" onclick="supprimerAvis('${key}')">Supprimer</button>` : ""}
-              `;
-              liste.appendChild(div);
-          });
-      }
+    if(nom === "" || commentaire.length < 10 || noteSelectionnee === 0){
+        alert("Remplis tout correctement (10 caractères minimum et note).");
+        return;
+    }
 
-      const moyenne = count ? (total / count).toFixed(1) : 0;
-      document.getElementById("moyenne").innerText = "Moyenne : " + moyenne + " ⭐";
-  }
+    let photoURL = "";
+    if(file){
+        try {
+            photoURL = await uploadPhoto(file);
+        } catch(e){
+            alert("Erreur lors de l'upload de l'image.");
+            return;
+        }
+    }
 
-  // 🔹 Supprimer un avis
-  window.supprimerAvis = function(key){
-      if(confirm("Supprimer cet avis ?")){
-          remove(ref(db, 'avis/' + key));
-      }
-  }
+    const date = new Date().toLocaleDateString();
+    const newAvisRef = push(ref(db, 'avis'));
+    set(newAvisRef, {nom, note: noteSelectionnee, commentaire, date, photoURL});
 
-  // 🔹 Mode admin
-  window.activerAdmin = function() {
-      const pass = document.getElementById("password").value;
-      if(pass === motDePasse){
-          admin = true;
-          alert("Mode admin activé");
-          document.getElementById("password").value = "";
-          // rafraîchir affichage pour montrer les boutons supprimer
-          onValue(ref(db, 'avis'), snapshot => {
-              afficherAvis(snapshot);
-          }, {onlyOnce: true});
-      } else alert("Mot de passe incorrect");
-  }
+    // Reset formulaire et aperçu
+    document.getElementById("nom").value = "";
+    document.getElementById("commentaire").value = "";
+    document.getElementById("photo").value = "";
+    previewImg.src = "";
+    previewImg.style.display = "none";
+    noteSelectionnee = 0;
+    updateStars();
+    document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : 0";
+}
 
-  // 🔹 Tout supprimer
-  window.resetAvis = function() {
-      if(admin && confirm("Tout supprimer ?")){
-          remove(ref(db, 'avis'));
-      }
-  }
+// 🔹 Afficher les avis
+function afficherAvis(snapshot) {
+    const liste = document.getElementById("listeAvis");
+    liste.innerHTML = "";
+    const data = snapshot.val();
+    let total = 0;
+    let count = 0;
 
-  // 🔹 Écoute en temps réel
-  onValue(ref(db, 'avis'), snapshot => {
-      afficherAvis(snapshot);
-  });
+    if(data){
+        Object.keys(data).forEach(key => {
+            const a = data[key];
+            total += a.note;
+            count++;
+            const div = document.createElement("div");
+            div.className = "review";
+            div.innerHTML = `
+                <strong>${a.nom}</strong> - ${a.date}<br>
+                ${"⭐".repeat(a.note)}
+                <p>${a.commentaire}</p>
+                ${a.photoURL ? `<img src="${a.photoURL}">` : ""}
+                ${admin ? `<button class="deleteBtn" onclick="supprimerAvis('${key}')">Supprimer</button>` : ""}
+            `;
+            liste.appendChild(div);
+        });
+    }
+
+    const moyenne = count ? (total / count).toFixed(1) : 0;
+    document.getElementById("moyenne").innerText = "Moyenne : " + moyenne + " ⭐";
+}
+
+// 🔹 Supprimer un avis
+window.supprimerAvis = function(key){
+    if(confirm("Supprimer cet avis ?")){
+        remove(ref(db, 'avis/' + key));
+    }
+}
+
+// 🔹 Mode admin
+window.activerAdmin = function() {
+    const pass = document.getElementById("password").value;
+    if(pass === motDePasse){
+        admin = true;
+        alert("Mode admin activé");
+        document.getElementById("password").value = "";
+        onValue(ref(db, 'avis'), snapshot => { afficherAvis(snapshot); }, {onlyOnce:true});
+    } else alert("Mot de passe incorrect");
+}
+
+// 🔹 Tout supprimer
+window.resetAvis = function() {
+    if(admin && confirm("Tout supprimer ?")){
+        remove(ref(db, 'avis'));
+    }
+}
+
+// 🔹 Écoute en temps réel
+onValue(ref(db, 'avis'), snapshot => { afficherAvis(snapshot); });
 </script>
 
 </body>
