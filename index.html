@@ -113,8 +113,6 @@ button {
 <h2>Avis</h2>
 <div id="listeAvis"></div>
 
-<button onclick="exportAvis()">Exporter les avis</button>
-
 <div class="admin">
 <h3>Mode admin</h3>
 <input type="password" id="password" placeholder="Mot de passe admin">
@@ -124,121 +122,140 @@ button {
 
 </div>
 
-<script>
-let avis = JSON.parse(localStorage.getItem("avisAppartement")) || [];
-let noteSelectionnee = 0;
-let admin = false;
-const motDePasse = "alexandre123";
+<!-- Firebase v9 modulaire -->
+<script type="module">
+  // 🔹 Import des fonctions Firebase
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics.js";
 
-// Sélection des étoiles avec survol et clic
-const stars = document.querySelectorAll(".stars span");
+  // 🔹 Configuration Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyA-iFaigj6_aHyyvc8wWHDVFpaiX1j-qOU",
+    authDomain: "appartement-hadj-alexandre.firebaseapp.com",
+    databaseURL: "https://appartement-hadj-alexandre-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "appartement-hadj-alexandre",
+    storageBucket: "appartement-hadj-alexandre.firebasestorage.app",
+    messagingSenderId: "446838776607",
+    appId: "1:446838776607:web:e11dd12a27c52952afc62a",
+    measurementId: "G-HFL77GDB15"
+  };
 
-stars.forEach(star => {
-    star.addEventListener("mouseover", () => {
-        const note = parseInt(star.dataset.note);
-        stars.forEach(s => {
-            s.classList.toggle("hovered", parseInt(s.dataset.note) <= note);
-        });
-    });
+  // 🔹 Initialisation
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+  const db = getDatabase(app);
 
-    star.addEventListener("mouseout", () => {
-        stars.forEach(s => s.classList.remove("hovered"));
-    });
+  // Variables
+  let noteSelectionnee = 0;
+  let admin = false;
+  const motDePasse = "alexandre123";
 
-    star.addEventListener("click", () => {
-        noteSelectionnee = parseInt(star.dataset.note);
-        updateStars();
-        document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : " + noteSelectionnee;
-    });
-});
+  // ⭐ Étoiles interactives
+  const stars = document.querySelectorAll(".stars span");
+  stars.forEach(star => {
+      star.addEventListener("mouseover", () => {
+          const note = parseInt(star.dataset.note);
+          stars.forEach(s => {
+              s.classList.toggle("hovered", parseInt(s.dataset.note) <= note);
+          });
+      });
+      star.addEventListener("mouseout", () => {
+          stars.forEach(s => s.classList.remove("hovered"));
+      });
+      star.addEventListener("click", () => {
+          noteSelectionnee = parseInt(star.dataset.note);
+          updateStars();
+          document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : " + noteSelectionnee;
+      });
+  });
+  function updateStars() {
+      stars.forEach(s => {
+          s.classList.toggle("active", parseInt(s.dataset.note) <= noteSelectionnee);
+      });
+  }
 
-function updateStars() {
-    stars.forEach(s => {
-        s.classList.toggle("active", parseInt(s.dataset.note) <= noteSelectionnee);
-    });
-}
+  // 🔹 Ajouter un avis
+  window.ajouterAvis = function() {
+      const nom = document.getElementById("nom").value.trim();
+      const commentaire = document.getElementById("commentaire").value.trim();
+      if(nom === "" || commentaire.length < 10 || noteSelectionnee === 0){
+          alert("Remplis tout correctement (10 caractères minimum et note).");
+          return;
+      }
 
-function ajouterAvis() {
-    const nom = document.getElementById("nom").value.trim();
-    const commentaire = document.getElementById("commentaire").value.trim();
+      const date = new Date().toLocaleDateString();
+      const newAvisRef = push(ref(db, 'avis'));
+      set(newAvisRef, {nom, note: noteSelectionnee, commentaire, date});
 
-    if(nom === "" || commentaire.length < 10 || noteSelectionnee === 0){
-        alert("Remplis tout correctement (10 caractères minimum et note).");
-        return;
-    }
+      document.getElementById("nom").value = "";
+      document.getElementById("commentaire").value = "";
+      noteSelectionnee = 0;
+      updateStars();
+      document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : 0";
+  }
 
-    const date = new Date().toLocaleDateString();
-    avis.push({nom, note: noteSelectionnee, commentaire, date});
-    localStorage.setItem("avisAppartement", JSON.stringify(avis));
+  // 🔹 Afficher les avis
+  function afficherAvis(snapshot) {
+      const liste = document.getElementById("listeAvis");
+      liste.innerHTML = "";
+      const data = snapshot.val();
+      let total = 0;
+      let count = 0;
 
-    // Reset
-    document.getElementById("nom").value="";
-    document.getElementById("commentaire").value="";
-    noteSelectionnee = 0;
-    updateStars();
-    document.getElementById("noteSelectionneeDisplay").innerText = "Note choisie : 0";
+      if(data){
+          Object.keys(data).forEach(key => {
+              const a = data[key];
+              total += a.note;
+              count++;
+              const div = document.createElement("div");
+              div.className = "review";
+              div.innerHTML = `
+                  <strong>${a.nom}</strong> - ${a.date}<br>
+                  ${"⭐".repeat(a.note)}
+                  <p>${a.commentaire}</p>
+                  ${admin ? `<button class="deleteBtn" onclick="supprimerAvis('${key}')">Supprimer</button>` : ""}
+              `;
+              liste.appendChild(div);
+          });
+      }
 
-    afficherAvis();
-}
+      const moyenne = count ? (total / count).toFixed(1) : 0;
+      document.getElementById("moyenne").innerText = "Moyenne : " + moyenne + " ⭐";
+  }
 
-function afficherAvis(){
-    const liste=document.getElementById("listeAvis");
-    liste.innerHTML="";
-    let total=0;
+  // 🔹 Supprimer un avis
+  window.supprimerAvis = function(key){
+      if(confirm("Supprimer cet avis ?")){
+          remove(ref(db, 'avis/' + key));
+      }
+  }
 
-    avis.forEach((a,index)=>{
-        total+=a.note;
-        let div=document.createElement("div");
-        div.className="review";
-        div.innerHTML=`
-        <strong>${a.nom}</strong> - ${a.date}<br>
-        ${"⭐".repeat(a.note)}
-        <p>${a.commentaire}</p>
-        ${admin ? `<button class="deleteBtn" onclick="supprimerAvis(${index})">Supprimer</button>`:""}
-        `;
-        liste.appendChild(div);
-    });
+  // 🔹 Mode admin
+  window.activerAdmin = function() {
+      const pass = document.getElementById("password").value;
+      if(pass === motDePasse){
+          admin = true;
+          alert("Mode admin activé");
+          document.getElementById("password").value = "";
+          // rafraîchir affichage pour montrer les boutons supprimer
+          onValue(ref(db, 'avis'), snapshot => {
+              afficherAvis(snapshot);
+          }, {onlyOnce: true});
+      } else alert("Mot de passe incorrect");
+  }
 
-    let moyenne=avis.length ? (total/avis.length).toFixed(1) : 0;
-    document.getElementById("moyenne").innerText="Moyenne : "+moyenne+" ⭐";
-}
+  // 🔹 Tout supprimer
+  window.resetAvis = function() {
+      if(admin && confirm("Tout supprimer ?")){
+          remove(ref(db, 'avis'));
+      }
+  }
 
-function supprimerAvis(index){
-    avis.splice(index,1);
-    localStorage.setItem("avisAppartement", JSON.stringify(avis));
-    afficherAvis();
-}
-
-function activerAdmin(){
-    const pass=document.getElementById("password").value;
-    if(pass===motDePasse){
-        admin=true;
-        alert("Mode admin activé");
-        afficherAvis();
-    } else alert("Mot de passe incorrect");
-}
-
-function resetAvis(){
-    if(admin && confirm("Tout supprimer ?")){
-        avis=[];
-        localStorage.removeItem("avisAppartement");
-        afficherAvis();
-    }
-}
-
-function exportAvis(){
-    const data=JSON.stringify(avis,null,2);
-    const blob=new Blob([data],{type:"application/json"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url;
-    a.download="avis.json";
-    a.click();
-}
-
-// Affichage initial
-afficherAvis();
-updateStars();
+  // 🔹 Écoute en temps réel
+  onValue(ref(db, 'avis'), snapshot => {
+      afficherAvis(snapshot);
+  });
 </script>
 
 </body>
